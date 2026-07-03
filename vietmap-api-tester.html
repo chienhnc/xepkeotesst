@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VietMap API Tester</title>
+<link href="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161922; --panel2:#1d2130; --border:#2a2f3d;
+    --text:#e8eaf0; --muted:#8b91a3; --accent:#3d8bfd; --accent2:#22c55e;
+    --danger:#f97066; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  #app{display:grid;grid-template-columns:380px 1fr;grid-template-rows:56px 1fr;height:100vh;}
+  header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--border);}
+  header h1{font-size:15px;font-weight:600;margin:0;white-space:nowrap;}
+  header .spacer{flex:1;}
+  header input[type=text]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;width:230px;}
+  header select{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 8px;font-size:12.5px;}
+  header button{cursor:pointer;border:none;border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:600;background:var(--accent);color:#fff;}
+  header button:hover{filter:brightness(1.1);}
+  header .status-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;}
+  header .status-dot.ok{background:var(--accent2);}
+  header label{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+
+  #sidebar{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+  #tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+  #tabs button{flex:1;background:transparent;border:none;color:var(--muted);padding:11px 4px;font-size:11.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;}
+  #tabs button.active{color:var(--text);border-bottom-color:var(--accent);}
+  #tabpanels{flex:1;overflow-y:auto;padding:14px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .field input, .field select{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .btn{cursor:pointer;border:none;border-radius:8px;padding:9px 12px;font-size:12.5px;font-weight:600;background:var(--accent2);color:#08260f;width:100%;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  .btn.small{width:auto;padding:6px 10px;font-size:11.5px;}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+
+  details{margin:10px 0;border:1px solid var(--border);border-radius:8px;}
+  details summary{cursor:pointer;padding:8px 10px;font-size:12px;font-weight:600;color:var(--muted);}
+  details .adv-body{padding:0 10px 10px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+  .chip{display:flex;align-items:center;gap:4px;font-size:11px;background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:4px 9px;cursor:pointer;color:var(--muted);}
+  .chip input{margin:0;width:auto;}
+  .chip.checked{color:var(--text);border-color:var(--accent);}
+
+  #results{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+  .result-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;transition:.1s;}
+  .result-item:hover{border-color:var(--accent);}
+  .result-item .name{font-size:13px;font-weight:600;}
+  .result-item .addr{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .result-item .meta{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;}
+  .badge{font-size:10px;padding:2px 7px;border-radius:20px;background:#26304a;color:#8ab4ff;}
+  .badge.dist{background:#2a3a2a;color:#8fd98f;}
+  .empty-state{font-size:12px;color:var(--muted);text-align:center;padding:30px 10px;}
+
+  .detail-card{margin-top:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.7;}
+  .detail-card .name{font-size:14px;font-weight:700;margin-bottom:4px;}
+  .detail-card table{width:100%;border-collapse:collapse;}
+  .detail-card td{padding:2px 0;vertical-align:top;}
+  .detail-card td:first-child{color:var(--muted);width:80px;}
+
+  #map{width:100%;height:100%;}
+  #mapWrap{position:relative;overflow:hidden;}
+  #styleSwitcher{position:absolute;top:10px;right:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px;z-index:5;}
+  #styleSwitcher button{background:var(--panel2);color:var(--text);border:1px solid transparent;border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer;text-align:left;}
+  #styleSwitcher button.active{border-color:var(--accent);color:var(--accent);}
+  #mapNotice{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,17,21,.92);z-index:10;font-size:13px;color:var(--muted);text-align:center;padding:20px;}
+
+  #logDrawer{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--border);z-index:6;transition:height .18s;height:34px;overflow:hidden;}
+  #logDrawer.open{height:280px;}
+  #logHeader{height:34px;display:flex;align-items:center;padding:0 12px;gap:10px;cursor:pointer;font-size:11.5px;color:var(--muted);}
+  #logHeader b{color:var(--text);}
+  #logBody{display:flex;height:246px;}
+  #logList{width:260px;border-right:1px solid var(--border);overflow-y:auto;font-size:11px;}
+  #logList .entry{padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;}
+  #logList .entry:hover{background:var(--panel2);}
+  #logList .entry.active{background:var(--panel2);border-left:2px solid var(--accent);}
+  #logList .entry .u{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #logList .entry .s{font-weight:700;}
+  #logList .entry .s.ok{color:var(--accent2);}
+  #logList .entry .s.err{color:var(--danger);}
+  #logDetail{flex:1;overflow:auto;padding:10px;}
+  #logDetail pre{white-space:pre-wrap;word-break:break-all;font-size:11px;margin:0;color:#c9d1e0;}
+  #logDetail .lbl{font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;}
+  #logDetail .url-box{background:var(--panel2);border-radius:6px;padding:8px;margin-bottom:10px;word-break:break-all;font-size:11px;}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#333a4a;border-radius:4px;}
+
+  #mapErrorBanner{position:absolute;top:10px;left:10px;right:170px;z-index:8;background:#3a1616;border:1px solid var(--danger);color:#ffd7d2;font-size:12px;line-height:1.5;padding:10px 12px;border-radius:8px;display:none;}
+  #mapErrorBanner b{display:block;margin-bottom:3px;}
+
+  #staticMapPreview{max-width:100%;border-radius:8px;margin-top:8px;display:none;border:1px solid var(--border);}
+  a#staticMapDownload{display:none;margin-top:8px;text-align:center;text-decoration:none;font-size:12px;color:var(--accent);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🗺️ VietMap API Tester</h1>
+    <span class="status-dot" id="statusDot"></span>
+    <input type="text" id="apiKeyInput" placeholder="API Key cho Autocomplete/Search/Place/Reverse/Static Map..." />
+    <button id="saveKeyBtn">Lưu Key</button>
+    <div class="spacer"></div>
+    <label for="globalDisplayType">display_type</label>
+    <select id="globalDisplayType">
+      <option value="">(mặc định)</option>
+      <option value="1">1 - mới (2 cấp)</option>
+      <option value="2">2 - cũ (3 cấp)</option>
+      <option value="3">3 - tự nhận diện</option>
+      <option value="5" selected>5 - cả hai, gốc=mới</option>
+      <option value="6">6 - cả hai, gốc=cũ</option>
+    </select>
+  </header>
+
+  <div id="sidebar">
+    <div id="tabs">
+      <button class="tab-btn active" data-tab="search">Tìm kiếm</button>
+      <button class="tab-btn" data-tab="reverse">Reverse</button>
+      <button class="tab-btn" data-tab="static">Static Map</button>
+      <button class="tab-btn" data-tab="style">Style</button>
+    </div>
+
+    <div id="tabpanels">
+
+      <!-- TAB: SEARCH (Autocomplete v4 + Search v4) -->
+      <div class="panel active" id="panel-search">
+        <div class="field">
+          <label>Nhập địa điểm / địa chỉ</label>
+          <input type="text" id="searchText" placeholder="VD: 197 Trần Phú, phường Chợ Quán..." autocomplete="off" />
+        </div>
+        <div class="row2">
+          <button class="btn secondary" id="btnSearchV4">Search v4 (đầy đủ)</button>
+          <button class="btn secondary" id="btnClearResults">Xoá kết quả</button>
+        </div>
+        <div class="hint">Gõ để tự động gợi ý (Autocomplete v4). Bấm "Search v4" để tìm theo chuỗi địa chỉ đầy đủ.</div>
+
+        <details>
+          <summary>Tham số nâng cao</summary>
+          <div class="adv-body">
+            <div class="field">
+              <label>focus (lat,lng) — ưu tiên tìm quanh vị trí</label>
+              <div class="row2">
+                <input type="text" id="focusLat" placeholder="lat" />
+                <input type="text" id="focusLng" placeholder="lng" />
+              </div>
+              <button class="btn secondary small" id="btnUseMapCenter" style="margin-top:6px;">Dùng tâm bản đồ hiện tại</button>
+            </div>
+            <div class="field">
+              <label>layers (lọc loại dữ liệu)</label>
+              <div class="chips" id="layerChips"></div>
+            </div>
+            <div class="field">
+              <label>cityId / distId / wardId</label>
+              <div class="row2" style="grid-template-columns:1fr 1fr 1fr;">
+                <input type="text" id="cityId" placeholder="cityId" />
+                <input type="text" id="distId" placeholder="distId" />
+                <input type="text" id="wardId" placeholder="wardId" />
+              </div>
+            </div>
+            <div class="field">
+              <label>circle_center / circle_radius (m)</label>
+              <div class="row2" style="grid-template-columns:1fr 1fr 1fr;">
+                <input type="text" id="circleLat" placeholder="lat" />
+                <input type="text" id="circleLng" placeholder="lng" />
+                <input type="text" id="circleRadius" placeholder="radius (m)" />
+              </div>
+            </div>
+            <div class="field">
+              <label>cats (danh mục POI, phân tách bởi dấu phẩy)</label>
+              <input type="text" id="catsInput" placeholder="VD: food,hospital" />
+            </div>
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="adminNew" style="width:auto;"/> admin_new (địa giới hành chính mới)</label>
+            </div>
+          </div>
+        </details>
+
+        <div id="results"><div class="empty-state">Kết quả tìm kiếm sẽ hiện ở đây.</div></div>
+        <div id="placeDetail"></div>
+      </div>
+
+      <!-- TAB: REVERSE v4 -->
+      <div class="panel" id="panel-reverse">
+        <div class="hint" style="margin-bottom:10px;">Click trực tiếp lên bản đồ để reverse geocode, hoặc nhập toạ độ thủ công.</div>
+        <div class="row2">
+          <div class="field"><label>lat</label><input type="text" id="revLat" placeholder="10.759157" /></div>
+          <div class="field"><label>lng</label><input type="text" id="revLng" placeholder="106.675859" /></div>
+        </div>
+        <div class="field">
+          <label>display_type (riêng Reverse)</label>
+          <select id="reverseDisplayType">
+            <option value="">(mặc định)</option>
+            <option value="1">1 - mới (2 cấp)</option>
+            <option value="2">2 - cũ (3 cấp)</option>
+            <option value="4">4 - 2 object riêng (mới+cũ)</option>
+            <option value="5" selected>5 - cả hai, gốc=mới</option>
+            <option value="6">6 - cả hai, gốc=cũ</option>
+          </select>
+        </div>
+        <button class="btn" id="btnReverse">Reverse geocode</button>
+        <div id="reverseResults"><div class="empty-state">Kết quả reverse sẽ hiện ở đây.</div></div>
+      </div>
+
+      <!-- TAB: STATIC MAP -->
+      <div class="panel" id="panel-static">
+        <div class="row2">
+          <div class="field"><label>lat *</label><input type="text" id="smLat" value="10.759157" /></div>
+          <div class="field"><label>lng *</label><input type="text" id="smLng" value="106.675859" /></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>zoom (0-20)</label><input type="text" id="smZoom" value="17" /></div>
+          <div class="field"><label>size (WxH)</label><input type="text" id="smSize" value="600x400" /></div>
+        </div>
+        <div class="field"><label>address (chữ hiển thị trên ảnh)</label><input type="text" id="smAddress" value="197 Trần Phú, phường Chợ Quán, TP.HCM" /></div>
+        <div class="field"><label>markerUrl (tuỳ chọn)</label><input type="text" id="smMarkerUrl" placeholder="https://..." /></div>
+        <button class="btn" id="btnStaticMap">Sinh ảnh bản đồ tĩnh (PNG)</button>
+        <img id="staticMapPreview" />
+        <a id="staticMapDownload" download="vietmap-static.png" class="btn secondary">⬇ Tải ảnh PNG</a>
+      </div>
+
+      <!-- TAB: STYLE -->
+      <div class="panel" id="panel-style">
+        <div class="hint">Chọn nền bản đồ (TileMap). Vector style dùng cho hiển thị tương tác; Satellite là raster tile.</div>
+        <div class="field" style="margin-top:10px;">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="trafficOverlay" style="width:auto;"/> Traffic overlay (thời gian thực)</label>
+        </div>
+        <div class="hint">Danh sách style ở góc phải bản đồ.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="map"></div>
+    <div id="mapNotice">Bản đồ dùng key mặc định có sẵn. Nhập API Key riêng của bạn ở góc trên để test Autocomplete / Search / Place / Reverse / Static Map.</div>
+    <div id="mapErrorBanner"></div>
+    <div id="styleSwitcher">
+      <button class="style-btn active" data-style="tm">Vector (Street)</button>
+      <button class="style-btn" data-style="lm">Vector (Light)</button>
+      <button class="style-btn" data-style="dm">Vector (Dark)</button>
+      <button class="style-btn" data-style="hm">Hybrid</button>
+      <button class="style-btn" data-style="satellite">Satellite</button>
+    </div>
+    <div id="logDrawer">
+      <div id="logHeader"><b>Log request/response</b><span id="logSummary">— chưa có request nào</span></div>
+      <div id="logBody">
+        <div id="logList"></div>
+        <div id="logDetail"><div class="empty-state">Chọn 1 mục ở danh sách bên trái để xem chi tiết.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = 'https://maps.vietmap.vn';
+const DEFAULT_CENTER = [106.675859, 10.759157]; // lng, lat (HCMC example from doc)
+const LAYER_OPTIONS = ['POI','ADDRESS','VILLAGE','WARD','DIST','CITY','STREET'];
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+let map, searchMarker, reverseMarker;
+let currentStyleCode = 'tm';
+let logHistory = [];
+
+// Key cố định dùng riêng cho TileMap (hiển thị bản đồ / style / tile).
+// Các API khác (Autocomplete, Search, Place, Reverse, Static Map) dùng key người dùng nhập ở ô apiKeyInput.
+const TILE_API_KEY = 'xxx';
+
+/* ---------------- API key handling (dùng cho các API tìm kiếm/place/reverse/static map) ---------------- */
+function getApiKey(){ return localStorage.getItem('vietmap_api_key') || ''; }
+function setApiKey(k){ localStorage.setItem('vietmap_api_key', k); }
+
+function refreshStatus(){
+  const has = !!getApiKey();
+  $('#statusDot').classList.toggle('ok', has);
+}
+
+function showMapErrorBanner(msg){
+  const el = $('#mapErrorBanner');
+  el.innerHTML = `<b>⚠ Bản đồ không tải được tile/style</b>${escapeHtml(msg)}<br>Kiểm tra: (1) API Key đúng & còn hiệu lực, (2) Key có giới hạn referer/domain — nếu mở file bằng file:// hãy chạy qua local server (vd: <code>python3 -m http.server</code>) hoặc gỡ giới hạn referer khi test, (3) xem chi tiết ở panel Log phía dưới.`;
+  el.style.display = 'block';
+}
+function clearMapErrorBanner(){
+  $('#mapErrorBanner').style.display = 'none';
+}
+
+$('#apiKeyInput').value = getApiKey();
+$('#saveKeyBtn').addEventListener('click', () => {
+  setApiKey($('#apiKeyInput').value.trim());
+  refreshStatus();
+  initOrUpdateMap();
+});
+
+/* ---------------- Tabs ---------------- */
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tab-btn').forEach(b => b.classList.remove('active'));
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('#panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------------- Layer chips (advanced) ---------------- */
+const layerChipsEl = $('#layerChips');
+LAYER_OPTIONS.forEach(l => {
+  const label = document.createElement('label');
+  label.className = 'chip';
+  label.innerHTML = `<input type="checkbox" value="${l}"/> ${l}`;
+  label.querySelector('input').addEventListener('change', (e) => {
+    label.classList.toggle('checked', e.target.checked);
+  });
+  layerChipsEl.appendChild(label);
+});
+function getSelectedLayers(){
+  return Array.from(layerChipsEl.querySelectorAll('input:checked')).map(i => i.value);
+}
+
+/* ---------------- Log drawer ---------------- */
+$('#logHeader').addEventListener('click', () => $('#logDrawer').classList.toggle('open'));
+
+function addLog(method, url, status, body){
+  const entry = { time: new Date().toLocaleTimeString(), method, url, status, body };
+  logHistory.unshift(entry);
+  if (logHistory.length > 40) logHistory.pop();
+  renderLogList();
+  renderLogDetail(entry);
+  $('#logSummary').textContent = `— ${entry.method} ${status} (${entry.time})`;
+  $('#logDrawer').classList.add('open');
+}
+
+function renderLogList(){
+  const el = $('#logList');
+  el.innerHTML = '';
+  logHistory.forEach((e, idx) => {
+    const div = document.createElement('div');
+    div.className = 'entry' + (idx === 0 ? ' active' : '');
+    const ok = (typeof e.status === 'number' && e.status >= 200 && e.status < 300);
+    div.innerHTML = `<div class="s ${ok ? 'ok' : 'err'}">${e.method} ${e.status}</div><div class="u">${e.url.replace(BASE,'')}</div><div class="u">${e.time}</div>`;
+    div.addEventListener('click', () => {
+      $$('#logList .entry').forEach(x => x.classList.remove('active'));
+      div.classList.add('active');
+      renderLogDetail(e);
+    });
+    el.appendChild(div);
+  });
+}
+
+function renderLogDetail(e){
+  const bodyStr = typeof e.body === 'string' ? e.body : JSON.stringify(e.body, null, 2);
+  $('#logDetail').innerHTML = `
+    <div class="lbl">Request URL</div>
+    <div class="url-box">${e.method} ${e.url}</div>
+    <div class="lbl">Response (status ${e.status})</div>
+    <pre>${(bodyStr || '').replace(/</g,'&lt;')}</pre>
+  `;
+}
+
+async function callApi(url, opts, method='GET'){
+  try{
+    const res = await fetch(url, opts);
+    const ct = res.headers.get('content-type') || '';
+    let data;
+    if (ct.includes('application/json')) data = await res.json();
+    else data = await res.text();
+    addLog(method, url, res.status, data);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return data;
+  }catch(err){
+    addLog(method, url, 'ERROR', String(err && err.message ? err.message : err));
+    throw err;
+  }
+}
+
+function buildParams(extra){
+  const dt = $('#globalDisplayType').value;
+  const p = new URLSearchParams();
+  p.set('apikey', getApiKey());
+  if (dt) p.set('display_type', dt);
+  Object.entries(extra || {}).forEach(([k,v]) => {
+    if (v !== undefined && v !== null && v !== '') p.set(k, v);
+  });
+  return p;
+}
+
+function buildAdvancedParams(){
+  const extra = {};
+  const flat = $('#focusLat').value.trim();
+  const flng = $('#focusLng').value.trim();
+  if (flat && flng) extra.focus = `${flat},${flng}`;
+  const layers = getSelectedLayers();
+  if (layers.length) extra.layers = layers.join(',');
+  if ($('#cityId').value.trim()) extra.cityId = $('#cityId').value.trim();
+  if ($('#distId').value.trim()) extra.distId = $('#distId').value.trim();
+  if ($('#wardId').value.trim()) extra.wardId = $('#wardId').value.trim();
+  const clat = $('#circleLat').value.trim(), clng = $('#circleLng').value.trim();
+  if (clat && clng) extra.circle_center = `${clat},${clng}`;
+  if ($('#circleRadius').value.trim()) extra.circle_radius = $('#circleRadius').value.trim();
+  if ($('#catsInput').value.trim()) extra.cats = $('#catsInput').value.trim();
+  if ($('#adminNew').checked) extra.admin_new = 'true';
+  return extra;
+}
+
+$('#btnUseMapCenter').addEventListener('click', () => {
+  if (!map) return;
+  const c = map.getCenter();
+  $('#focusLat').value = c.lat.toFixed(6);
+  $('#focusLng').value = c.lng.toFixed(6);
+});
+
+/* ---------------- Autocomplete v4 / Search v4 ---------------- */
+let debounceTimer;
+$('#searchText').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  const text = $('#searchText').value.trim();
+  if (!text){ clearResults(); return; }
+  debounceTimer = setTimeout(() => doAutocomplete(text), 350);
+});
+
+$('#btnSearchV4').addEventListener('click', () => {
+  const text = $('#searchText').value.trim();
+  if (!text) return alert('Nhập text tìm kiếm trước đã.');
+  doSearchV4(text);
+});
+$('#btnClearResults').addEventListener('click', clearResults);
+
+function clearResults(){
+  $('#results').innerHTML = '<div class="empty-state">Kết quả tìm kiếm sẽ hiện ở đây.</div>';
+}
+
+async function doAutocomplete(text){
+  if (!requireKey()) return;
+  const params = buildParams({ text, ...buildAdvancedParams() });
+  const url = `${BASE}/api/autocomplete/v4?${params}`;
+  try{
+    const data = await callApi(url, undefined, 'GET');
+    renderResults(extractList(data), 'Autocomplete');
+  }catch(e){ renderError(e); }
+}
+
+async function doSearchV4(text){
+  if (!requireKey()) return;
+  const params = buildParams({ text, ...buildAdvancedParams() });
+  const url = `${BASE}/api/search/v4?${params}`;
+  try{
+    const data = await callApi(url, undefined, 'GET');
+    renderResults(extractList(data), 'Search');
+  }catch(e){ renderError(e); }
+}
+
+function extractList(data){
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.data)) return data.data;
+  if (data && Array.isArray(data.results)) return data.results;
+  return [];
+}
+
+function renderError(e){
+  $('#results').innerHTML = `<div class="empty-state" style="color:var(--danger);">Lỗi gọi API: ${e.message || e}. Kiểm tra API Key / xem tab log phía dưới bản đồ.</div>`;
+}
+
+function renderResults(list, source){
+  const el = $('#results');
+  if (!list || !list.length){
+    el.innerHTML = `<div class="empty-state">Không tìm thấy địa điểm nào (${source}).</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    const name = item.name || item.display || item.address || '(không tên)';
+    const addr = item.address || item.display || '';
+    const dist = (item.distance !== undefined && item.distance !== null) ? `${item.distance} km` : null;
+    const cats = (item.categories || []).slice(0,3).map(c => (typeof c === 'string' ? c : (c.name || ''))).filter(Boolean);
+    div.innerHTML = `
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="addr">${escapeHtml(addr)}</div>
+      <div class="meta">
+        <span class="badge">${source}</span>
+        ${dist ? `<span class="badge dist">${dist}</span>` : ''}
+        ${cats.map(c => `<span class="badge">${escapeHtml(c)}</span>`).join('')}
+      </div>`;
+    div.addEventListener('click', () => {
+      if (item.ref_id) fetchPlace(item.ref_id);
+      else if (item.lat && item.lng) flyToMarker(item.lat, item.lng, name, 'search');
+    });
+    el.appendChild(div);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------------- Place v4 ---------------- */
+async function fetchPlace(refid){
+  if (!requireKey()) return;
+  const params = new URLSearchParams({ apikey: getApiKey(), refid });
+  const url = `${BASE}/api/place/v4?${params}`;
+  try{
+    const data = await callApi(url, undefined, 'GET');
+    showPlaceDetail(data);
+    if (data && data.lat && data.lng) flyToMarker(data.lat, data.lng, data.display || data.name, 'search');
+  }catch(e){
+    $('#placeDetail').innerHTML = `<div class="empty-state" style="color:var(--danger);">Lỗi lấy chi tiết địa điểm.</div>`;
+  }
+}
+
+function showPlaceDetail(d){
+  $('#placeDetail').innerHTML = `
+    <div class="detail-card">
+      <div class="name">${escapeHtml(d.display || d.name || '(không tên)')}</div>
+      <table>
+        <tr><td>Số nhà</td><td>${escapeHtml(d.hs_num || '-')}</td></tr>
+        <tr><td>Đường</td><td>${escapeHtml(d.street || '-')}</td></tr>
+        <tr><td>Phường</td><td>${escapeHtml(d.ward || '-')}</td></tr>
+        <tr><td>Quận/Huyện</td><td>${escapeHtml(d.district || '-')}</td></tr>
+        <tr><td>Tỉnh/TP</td><td>${escapeHtml(d.city || '-')}</td></tr>
+        <tr><td>Địa chỉ</td><td>${escapeHtml(d.address || '-')}</td></tr>
+        <tr><td>Toạ độ</td><td>${d.lat || '-'}, ${d.lng || '-'}</td></tr>
+      </table>
+    </div>`;
+}
+
+/* ---------------- Reverse v4 ---------------- */
+$('#btnReverse').addEventListener('click', () => {
+  const lat = $('#revLat').value.trim();
+  const lng = $('#revLng').value.trim();
+  if (!lat || !lng) return alert('Nhập lat và lng.');
+  doReverse(lat, lng);
+});
+
+function setReverseCoords(lat, lng){
+  $('#revLat').value = lat.toFixed ? lat.toFixed(6) : lat;
+  $('#revLng').value = lng.toFixed ? lng.toFixed(6) : lng;
+}
+
+async function doReverse(lat, lng){
+  if (!requireKey()) return;
+  const dt = $('#reverseDisplayType').value;
+  const params = new URLSearchParams({ apikey: getApiKey(), lat, lng });
+  if (dt) params.set('display_type', dt);
+  const url = `${BASE}/api/reverse/v4?${params}`;
+  try{
+    const data = await callApi(url, undefined, 'GET');
+    renderReverseResults(extractList(data));
+  }catch(e){
+    $('#reverseResults').innerHTML = `<div class="empty-state" style="color:var(--danger);">Lỗi reverse geocode.</div>`;
+  }
+}
+
+function renderReverseResults(list){
+  const el = $('#reverseResults');
+  if (!list || !list.length){
+    el.innerHTML = '<div class="empty-state">Không có kết quả.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    const name = item.name || item.display || item.address || '(không tên)';
+    div.innerHTML = `
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="addr">${escapeHtml(item.address || item.display || '')}</div>
+      <div class="meta">${item.distance !== undefined ? `<span class="badge dist">${item.distance} km</span>` : ''}</div>`;
+    div.addEventListener('click', () => {
+      if (item.ref_id) fetchPlace(item.ref_id);
+    });
+    el.appendChild(div);
+  });
+}
+
+/* ---------------- Static Map API ---------------- */
+$('#btnStaticMap').addEventListener('click', async () => {
+  if (!requireKey()) return;
+  const lat = $('#smLat').value.trim();
+  const lng = $('#smLng').value.trim();
+  if (!lat || !lng) return alert('Nhập lat/lng.');
+  const fd = new FormData();
+  fd.append('lat', lat);
+  fd.append('lng', lng);
+  fd.append('apikey', getApiKey());
+  if ($('#smZoom').value.trim()) fd.append('zoom', $('#smZoom').value.trim());
+  if ($('#smSize').value.trim()) fd.append('size', $('#smSize').value.trim());
+  if ($('#smAddress').value.trim()) fd.append('address', $('#smAddress').value.trim());
+  if ($('#smMarkerUrl').value.trim()) fd.append('markerUrl', $('#smMarkerUrl').value.trim());
+
+  const url = `${BASE}/api/maps/statics/tm`;
+  try{
+    const res = await fetch(url, { method: 'POST', body: fd });
+    if (!res.ok){
+      const t = await res.text();
+      addLog('POST', url, res.status, t);
+      alert(`Lỗi ${res.status} khi sinh ảnh. Xem log bên dưới bản đồ.`);
+      return;
+    }
+    const blob = await res.blob();
+    addLog('POST', url, res.status, `(binary PNG, ${blob.size} bytes)`);
+    const imgUrl = URL.createObjectURL(blob);
+    const img = $('#staticMapPreview');
+    img.src = imgUrl;
+    img.style.display = 'block';
+    const dl = $('#staticMapDownload');
+    dl.href = imgUrl;
+    dl.style.display = 'block';
+  }catch(e){
+    addLog('POST', url, 'ERROR', String(e));
+    alert('Lỗi request: ' + e.message);
+  }
+});
+
+/* ---------------- Map / TileMap (luôn dùng TILE_API_KEY cố định) ---------------- */
+function styleJsonUrl(code){
+  return `${BASE}/maps/styles/${code}/style.json?apikey=${encodeURIComponent(TILE_API_KEY)}`;
+}
+function satelliteStyle(){
+  return {
+    version: 8,
+    sources: {
+      sat: {
+        type: 'raster',
+        tiles: [`${BASE}/maps/tiles/st/{z}/{x}/{y}.png?apikey=${encodeURIComponent(TILE_API_KEY)}`],
+        tileSize: 256,
+        attribution: '© VietMap'
+      }
+    },
+    layers: [{ id: 'sat', type: 'raster', source: 'sat' }]
+  };
+}
+
+function initOrUpdateMap(){
+  const style = currentStyleCode === 'satellite' ? satelliteStyle() : styleJsonUrl(currentStyleCode);
+  if (!map){
+    map = new vietmapgl.Map({
+      container: 'map',
+      style,
+      center: DEFAULT_CENTER,
+      zoom: 13,
+    });
+    map.addControl(new vietmapgl.NavigationControl(), 'top-left');
+    map.on('error', (e) => {
+      const url = (e && e.error && e.error.url) || (e && e.target && e.target.getStyle && '') || style;
+      const msg = (e && e.error && (e.error.message || e.error.statusText)) || 'Không tải được style/tile. Kiểm tra API Key hoặc referer đang bị chặn.';
+      addLog('MAP-TILE', typeof url === 'string' ? url : String(url), (e && e.error && e.error.status) || 'ERROR', msg);
+      showMapErrorBanner(msg);
+    });
+    map.on('click', (e) => {
+      const { lat, lng } = e.lngLat;
+      setReverseCoords(lat, lng);
+      $$('.tab-btn').forEach(b => b.classList.remove('active'));
+      $$('.panel').forEach(p => p.classList.remove('active'));
+      $('.tab-btn[data-tab="reverse"]').classList.add('active');
+      $('#panel-reverse').classList.add('active');
+      flyToMarker(lat, lng, 'Vị trí click', 'reverse');
+      doReverse(lat, lng);
+    });
+    map.on('style.load', maybeApplyTraffic);
+    map.once('load', clearMapErrorBanner);
+  } else {
+    clearMapErrorBanner();
+    map.setStyle(style);
+    map.once('style.load', maybeApplyTraffic);
+  }
+  refreshStatus();
+}
+
+async function maybeApplyTraffic(){
+  if (!$('#trafficOverlay').checked) return;
+  try{
+    const res = await fetch(styleJsonUrl('tf'));
+    const tf = await res.json();
+    Object.entries(tf.sources || {}).forEach(([id, src]) => {
+      if (!map.getSource(id)) map.addSource(id, src);
+    });
+    (tf.layers || []).forEach(layer => {
+      if (!map.getLayer(layer.id)) map.addLayer(layer);
+    });
+  }catch(e){ console.warn('Không thể áp traffic overlay', e); }
+}
+$('#trafficOverlay').addEventListener('change', () => {
+  if (map) map.once('idle', maybeApplyTraffic), maybeApplyTraffic();
+});
+
+$$('.style-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.style-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentStyleCode = btn.dataset.style;
+    initOrUpdateMap();
+  });
+});
+
+function flyToMarker(lat, lng, label, kind){
+  if (!map) return;
+  const lngNum = parseFloat(lng), latNum = parseFloat(lat);
+  map.flyTo({ center: [lngNum, latNum], zoom: 16 });
+  const color = kind === 'reverse' ? '#f97066' : '#3d8bfd';
+  if (kind === 'reverse'){
+    if (reverseMarker) reverseMarker.remove();
+    reverseMarker = new vietmapgl.Marker({ color })
+      .setLngLat([lngNum, latNum])
+      .setPopup(new vietmapgl.Popup().setText(label || ''))
+      .addTo(map);
+  } else {
+    if (searchMarker) searchMarker.remove();
+    searchMarker = new vietmapgl.Marker({ color })
+      .setLngLat([lngNum, latNum])
+      .setPopup(new vietmapgl.Popup().setText(label || ''))
+      .addTo(map);
+  }
+}
+
+function requireKey(){
+  if (!getApiKey()){
+    alert('Vui lòng nhập và lưu VietMap API Key trước.');
+    return false;
+  }
+  return true;
+}
+
+/* ---------------- Init ---------------- */
+refreshStatus();
+initOrUpdateMap();
+</script>
+</body>
+</html>
